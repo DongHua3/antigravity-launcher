@@ -1,0 +1,67 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - 'v4.0.4-lite'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-4.0.4-lite
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/tauri-ci.yml
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify release version
+        run: |
+          node -e "const p=require('./package.json');if(p.version!=='4.0.4'||p.edition!=='lite')process.exit(1)"
+      - uses: actions/download-artifact@v4
+        with:
+          name: AGLauncher-4.0.4-lite-windows-x64
+          path: release-out
+      - uses: actions/download-artifact@v4
+        with:
+          name: AGLauncher-4.0.4-lite-macos-arm64-beta
+          path: release-out
+      - uses: actions/download-artifact@v4
+        with:
+          name: AGLauncher-4.0.4-lite-macos-x64-beta
+          path: release-out
+      - name: Verify packages and generate SHA256
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-out
+          test "$(find . -maxdepth 1 -name '*.zip' | wc -l)" -eq 3
+          for f in *.zip; do
+            unzip -t "$f"
+            sha256sum "$f" > "SHA256-${f}.sha256"
+          done
+      - name: Publish AGL 4.0.4 Lite
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v4.0.4-lite
+          target_commitish: ${{ github.sha }}
+          name: v4.0.4 Lite
+          make_latest: true
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          body: |
+            Antigravity launcher: optional process proxy, reversible UI localisation, tray resident.
+
+            See README.md for usage. SHA-256 checksums are attached next to each archive.
+          files: |
+            release-out/*.zip
+            release-out/*.sha256

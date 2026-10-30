@@ -1,0 +1,188 @@
+name: Tauri Build
+
+on:
+  push:
+    branches: [main, v3-pilot]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            build-args: --no-bundle
+            name: windows-x64
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            build-args: --bundles app
+            name: macos-arm64
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+            build-args: --bundles app
+            name: macos-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Backend dependencies and regressions
+        run: |
+          npm ci
+          npm run check
+          npm test
+      - name: Launcher browser regression
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          node test/launcher-browser.cjs 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Prepare self-contained runtime
+        run: node scripts/prepare-tauri.cjs ${{ matrix.target }}
+      - name: Include runtime license
+        shell: bash
+        run: curl --fail --location "https://raw.githubusercontent.com/nodejs/node/$(node -p process.version)/LICENSE" --output src-tauri/backend/NODE-LICENSE.txt
+      - name: Test packaged backend without developer dependencies
+        shell: bash
+        run: |
+          export AGL_TEST_NODE="$PWD/src-tauri/binaries/agl-node-${{ matrix.target }}"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then export AGL_TEST_NODE="$AGL_TEST_NODE.exe"; fi
+          export AGL_TEST_SERVER="$PWD/src-tauri/backend/server.js"
+          node test/tauri-lifecycle.test.cjs
+      - name: Build native application
+        run: npx --yes @tauri-apps/cli@2 build --target ${{ matrix.target }} ${{ matrix.build-args }}
+      - name: Package Windows portable ZIP
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $name = 'AGLauncher-4.0.4-lite-windows-x64'
+          $stage = Join-Path 'dist-tauri' $name
+          New-Item -ItemType Directory -Path $stage | Out-Null
+          $release = 'src-tauri/target/${{ matrix.target }}/release'
+          Copy-Item -LiteralPath "$release/aglauncher.exe" -Destination "$stage/AGLauncher.exe"
+          Copy-Item -LiteralPath 'src-tauri/binaries/agl-node-${{ matrix.target }}.exe' -Destination "$stage/agl-node.exe"
+          Copy-Item -LiteralPath 'src-tauri/backend' -Destination "$stage/backend" -Recurse
+          Get-ChildItem -LiteralPath $release -Filter '*.dll' -File | Copy-Item -Destination $stage
+          Copy-Item -LiteralPath 'LICENSE','README.md','THIRD-PARTY-NOTICES.md' -Destination $stage
+          Compress-Archive -LiteralPath $stage -DestinationPath "$name.zip"
+          Expand-Archive -LiteralPath "$name.zip" -DestinationPath 'dist-tauri/verify'
+          $extracted = (Resolve-Path "dist-tauri/verify/$name").Path
+          foreach ($file in @('AGLauncher.exe','agl-node.exe','backend/server.js','backend/index.html','backend/dicts/common.json','backend/dicts/ui_v2.json','backend/package.json','backend/node_modules/ws/package.json','backend/NODE-LICENSE.txt')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $extracted $file))) { throw "Missing portable resource: $file" }
+          }
+          $env:AGL_TEST_NODE = Join-Path $extracted 'agl-node.exe'
+          $env:AGL_TEST_SERVER = Join-Path $extracted 'backend/server.js'
+          node test/tauri-lifecycle.test.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-FileHash -LiteralPath "$name.zip" -Algorithm SHA256
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          app="src-tauri/target/${{ matrix.target }}/release/bundle/macos/AGLauncher.app"
+          test -f "$app/Contents/Resources/backend/server.js"
+          test -f "$app/Contents/Resources/backend/node_modules/ws/package.json"
+          test -x "$app/Contents/MacOS/agl-node"
+          
+          # 1. 对 agl-node 补充 Hardened Runtime 与 JIT 权限 (解决 Apple Silicon V8 ThreadIsolation SIGTRAP 退出码 133)
+          codesign --force --options runtime --sign - --entitlements src-tauri/Entitlements.plist "$app/Contents/MacOS/agl-node"
+
+          # 2. 对整个 AGLauncher.app 补充 Entitlements 签名
+          codesign --force --options runtime --deep --sign - --entitlements src-tauri/Entitlements.plist "$app"
+
+          # 3. 校验签名与 JIT 权限输出
+          codesign --verify --deep --strict "$app"
+          codesign -d --entitlements :- "$app/Contents/MacOS/agl-node"
+
+          # 4. 关键自检：在当前 runner 上执行 V8 初始化测试，确保不会出现 SIGTRAP
+          "$app/Contents/MacOS/agl-node" -e "console.log('agl-node JIT OK, V8:', process.versions.v8)"
+
+          # 5. 打包分发 ZIP 包（保持 macOS 扩展属性、代码签名与完整 App 外壳）
+          mkdir -p dist-tauri
+          zip_name="AGLauncher-4.0.4-lite-${{ matrix.name }}-beta.zip"
+          zip_path="dist-tauri/$zip_name"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$zip_path"
+
+          # 6. 完整性自检：校验 ZIP 结构与中央目录，杜绝坏包
+          unzip -t "$zip_path"
+
+          # 7. 模拟解压校验关键入口与可执行权限
+          verify_dir="dist-tauri/verify"
+          mkdir -p "$verify_dir"
+          ditto -x -k "$zip_path" "$verify_dir/"
+          test -d "$verify_dir/AGLauncher.app"
+          test -x "$verify_dir/AGLauncher.app/Contents/MacOS/AGLauncher"
+          test -x "$verify_dir/AGLauncher.app/Contents/MacOS/agl-node"
+          test -f "$verify_dir/AGLauncher.app/Contents/Resources/backend/server.js"
+          rm -rf "$verify_dir"
+
+          # 8. 输出 SHA256 校验和到日志
+          shasum -a 256 "$zip_path"
+      - name: Upload Windows package
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AGLauncher-4.0.4-lite-${{ matrix.name }}
+          path: AGLauncher-4.0.4-lite-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload macOS app (Beta)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AGLauncher-4.0.4-lite-${{ matrix.name }}-beta
+          path: dist-tauri/AGLauncher-4.0.4-lite-${{ matrix.name }}-beta.zip
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload Standard Workflow Test Suite
+        if: matrix.name == 'windows-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: AGLauncher-4.0.4-lite-standard-workflow-test-suite
+          path: |
+            test/
+            core/
+            features/
+            adapters/
+            desktop/
+            ui/
+            scripts/check.cjs
+            scripts/backend-resources.cjs
+            scripts/build-update-manifest.cjs
+            src-tauri/src/main.rs
+            src-tauri/capabilities/
+            src-tauri/tauri.conf.json
+            dicts/
+            assets/*.png
+            package.json
+            package-lock.json
+            update-manifest.json
+            server.js
+            index.html
+            THIRD-PARTY-NOTICES.md
+            README.md
+          retention-days: 14
+      - name: Build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-metadata-${{ matrix.name }}
+          path: |
+            src-tauri/Cargo.lock
+            src-tauri/tauri.conf.json
+          retention-days: 14

@@ -1,0 +1,96 @@
+{
+  "edition": "lite",
+  "version": "4.0.4",
+  "dictVersion": "2026-10-27-hotfix1",
+  "dicts": {
+    "ui_v2.json": {
+      "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/dicts/ui_v2.json",
+      "sha256": "76c8fd84c9a7383d564e0ca4930c0bf54443ba113c8a385abe660b9d2a6eab7b"
+    },
+    "common.json": {
+      "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/dicts/common.json",
+      "sha256": "9fd693579bc1dfcffbbd0b81eeae1e1b1db49f05b24737510ce35429e3aa1ab5"
+    }
+  },
+  "runtime": {
+    "version": "4.0.4",
+    "files": {
+      "server.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/server.js",
+        "sha256": "b98a767880ccdc2cd25195265b0e96f8907c9749858f8709cf93eb9a00044e70"
+      },
+      "index.html": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/index.html",
+        "sha256": "e69e86c0fcab858f2c5dba90cfb5426afd0891ab621acb5947f7fc17c77227f9"
+      },
+      "core/events.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/core/events.js",
+        "sha256": "5a205d3293b56485eb454490abff272c4d22aabe04604a0af1d0e0e55ae92eca"
+      },
+      "core/session.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/core/session.js",
+        "sha256": "094ee85f7544b8388bacd7ca5c4c40500663ff197424156c0a8eb48259dd2858"
+      },
+      "core/settings.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/core/settings.js",
+        "sha256": "c6a7674905de7f56b3a0fdfd26523c88e595d43a1a956ea16ad6fbaae25813a3"
+      },
+      "core/storage.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/core/storage.js",
+        "sha256": "38614c8f242b7d980eefded74b588f84c0f82963b09e0fca8c7dea644d2251c0"
+      },
+      "features/i18n.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/features/i18n.js",
+        "sha256": "cae011e9627fc86ca363e8f4d7ff7d769717d32cf5f4be61a7458adf1bd1950f"
+      },
+      "features/proxy.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/features/proxy.js",
+        "sha256": "5a51d0ba57845db29fd357ee318642b37b894698c0d227feca24cb9b60b709d4"
+      },
+      "features/updater.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/features/updater.js",
+        "sha256": "1ad9ec8f77ceefa8647cabe464ba4c16cbb4010b998b46f263e39af27d957d93"
+      },
+      "adapters/desktop/cdp.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/adapters/desktop/cdp.js",
+        "sha256": "dcf2381e68f202e3e3c9cdd7f865206d3d5e2a403a9f51414a096c5d7d0caf1a"
+      },
+      "adapters/desktop/discovery.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/adapters/desktop/discovery.js",
+        "sha256": "09ac59a7cda2e01cc586ea898e0813387929fbf91273b362bb80e7d816b92492"
+      },
+      "adapters/desktop/index.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/adapters/desktop/index.js",
+        "sha256": "71e47bb81185b30fd3ed66c424529f3810bea566a225caf2b8dbdbc781ca91ed"
+      },
+      "adapters/desktop/renderer.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/adapters/desktop/renderer.js",
+        "sha256": "f8d00b1fe9308bff2f4b33ea1905eba05b6707110641d1e72cc1ae10a439d257"
+      },
+      "desktop/api.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/desktop/api.js",
+        "sha256": "d8862799a4d501bbd5f4be1da04f67f537a90e4c03af556e9258e02d83f1775b"
+      },
+      "desktop/application.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/desktop/application.js",
+        "sha256": "4978eceec49e0c01c9d1637d671335b23444bf51312df89c44dae11dcdd37a43"
+      },
+      "desktop/host.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/desktop/host.js",
+        "sha256": "3e86e1bbbfac5ddb7bd1d35caeb6f91e7cc58d83ebcc97ba2775b3c2494ccfc4"
+      },
+      "ui/api.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/ui/api.js",
+        "sha256": "27a368b1da46416ccf87f4470f4cae4f2bcb1903b1461984f829adc9fde34fab"
+      },
+      "ui/launcher.css": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/ui/launcher.css",
+        "sha256": "941089ade585e2c4a81a6b2f6d15b4bc24206090f61a7399937b6072ed0d518d"
+      },
+      "ui/launcher.js": {
+        "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/ui/launcher.js",
+        "sha256": "5e777cbd2b1b0a5e0b4393c009813754396877b99a57a079040f162f4e0f4652"
+      }
+    }
+  }
+}

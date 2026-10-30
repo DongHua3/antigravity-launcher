@@ -1,0 +1,36 @@
+# Build outputs
+AGLauncher.exe
+AGLauncher-dist/
+AGLauncher*.zip
+*.zip
+
+# Temp/test files
+_dom_probe*.js
+test*.py
+test*.txt
+ag_*.log
+agl-error.log
+agl.lock
+debug.flag
+test-backups/
+safety-e2e-followup.txt
+
+# Local dependencies and release staging
+node_modules/
+.reference/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Tauri build outputs (profiles and runtime binaries never enter Git)
+src-tauri/target/
+src-tauri/gen/
+src-tauri/backend/
+src-tauri/binaries/agl-node-*
+agl.log*
+settings.json
+
+# Runtime artifacts
+*.json.*.tmp
+.playwright-cli/

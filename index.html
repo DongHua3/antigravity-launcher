@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AG Launcher</title>
+  <link rel="icon" type="image/png" href="/assets/logo-32.png">
+  <link rel="shortcut icon" type="image/png" href="/assets/logo-32.png">
+  <link rel="apple-touch-icon" href="/assets/logo-64.png">
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('agl-theme');
+        var dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.dataset.theme = (saved === 'light' || saved === 'dark') ? saved : (dark ? 'dark' : 'light');
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/ui/launcher.css">
+</head>
+<body>
+
+  <!-- 顶部状态栏 -->
+  <div class="nav-header">
+    <div class="brand">
+      <span class="brand-title">AG Launcher <span class="edition-tag">Lite</span></span>
+      <button type="button" class="version-pill" id="updateBtn" data-action="check-update" title="检查并拉取 Lite 版最新内核与汉化词典，免重装直接生效">
+        <span id="versionBadge">v4.0.4</span>
+        <span class="version-sep">·</span>
+        <span id="updateActionText">↻ 检查更新</span>
+      </button>
+    </div>
+    <div class="nav-actions">
+      <button type="button" class="tray-btn icon-only" id="themeToggleBtn" data-action="toggle-theme" title="切换浅色 / 深色外观（顶栏与面板同步变色）">
+        <span id="themeToggleText">☀️</span>
+      </button>
+      <div class="status-capsule" id="clientStatusBadge">
+        <div class="dot"></div>
+        <span>未运行</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 卡片 1: 原生代理 -->
+  <div class="card">
+    <div class="card-label">网络与免 TUN 链路</div>
+    <div class="row">
+      <span style="font-weight: 500;">免 TUN 进程代理 <span id="patchStatusBadge" style="font-size: 11px; font-weight: 600; color: var(--green);">· 本地代理就绪</span></span>
+      <label class="switch" title="开启后为 AG 进程注入本地代理；直连环境（如海外/台湾/全局VPN用户）可关闭">
+        <input type="checkbox" id="proxyToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="row" id="proxyPortRow">
+      <span style="font-weight: 500;">本地代理端口:</span>
+      <div class="port-cluster">
+        <button type="button" class="quick-tag" data-port="7890" title="7890: Mihomo / Clash 默认端口">
+          7890 <span class="tag-hint">Mihomo</span>
+        </button>
+        <button type="button" class="quick-tag" data-port="7897" title="7897: Clash Verge / Verge Rev 默认端口">
+          7897 <span class="tag-hint">Verge</span>
+        </button>
+        <button type="button" class="quick-tag" data-port="10808" title="10808: v2rayN / Xray 默认端口">
+          10808 <span class="tag-hint">v2ray</span>
+        </button>
+        <input type="text" id="proxyPortInput" inputmode="numeric" pattern="[0-9]*" maxlength="5" value="7890" placeholder="7890">
+      </div>
+    </div>
+  </div>
+
+  <!-- 卡片 2: 本地化汉化 -->
+  <div class="card">
+    <div class="card-label">界面深度汉化</div>
+    <div class="row">
+      <span style="font-weight: 500;">实时 DOM 字典翻译 <span id="dictCountBadge" class="dict-badge">· 已载入词条</span></span>
+      <label class="switch">
+        <input type="checkbox" id="i18nToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- 启动目标选择器：常显，支持桌面版与 IDE 版随时切换与查看 -->
+  <div class="target-switcher" id="targetSwitcher">
+    <span class="switcher-label">启动目标</span>
+    <div class="switcher-pills" role="radiogroup" aria-label="选择启动目标">
+      <button type="button" class="target-pill active" data-target="hub" id="targetHubBtn" title="启动 Antigravity 官方桌面客户端">
+        <span class="pill-dot" id="hubDot"></span>
+        <span class="pill-icon">💻</span>
+        <span>桌面版</span>
+      </button>
+      <button type="button" class="target-pill" data-target="ide" id="targetIdeBtn" title="启动 Antigravity IDE 编辑器版（基于 VS Code）">
+        <span class="pill-dot" id="ideDot"></span>
+        <span class="pill-icon">📝</span>
+        <span>IDE 版</span>
+      </button>
+    </div>
+  </div>
+
+
+
+  <!-- 核心启动按钮 -->
+  <button class="launch-btn" id="launchBtn" data-action="launch">
+    <span class="launch-icon" id="launchIcon">🚀</span>
+    <span id="launchText">启动 Antigravity</span>
+  </button>
+
+  <!-- 运行日志：常显卡片，不折叠 -->
+  <div class="advanced" id="advancedPanel">
+    <div class="advanced-head">
+      <span>运行日志</span>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <button type="button" class="clean-btn" data-action="copy-logs">复制日志</button>
+        <button type="button" class="clean-btn" data-action="clear-logs">清空</button>
+      </div>
+    </div>
+    <div class="advanced-body">
+      <div class="console-pane">
+        <div class="console" id="consoleBox">
+          <div class="log-line" style="color: var(--text-dark);">[SYSTEM] AG Launcher 已就绪。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 路径选择兜底模态弹窗（仅在未找到程序或启动报错时弹出，平时完全不占空间） -->
+  <div class="modal-backdrop" id="pathModal" style="display: none;">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTargetTitle">
+      <div class="modal-head">
+        <div class="modal-title">
+          <span class="modal-icon">⚠️</span>
+          <span id="modalTargetTitle">未找到可执行程序</span>
+        </div>
+        <button type="button" class="modal-close-btn" id="modalCloseBtn" aria-label="关闭">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc" id="pathTipText">未在默认路径检测到程序。如安装在非 C 盘，请点击“浏览”指定 .exe 文件路径：</p>
+        <div class="modal-input-row">
+          <input type="text" id="customPathInput" placeholder="输入或浏览选择 .exe 完整路径" spellcheck="false">
+          <button type="button" class="btn-path-action btn-browse" id="browseExeBtn" title="打开 Windows 文件选择器选择可执行文件">📂 浏览</button>
+        </div>
+        <div class="modal-error-tip" id="pathEditTip" style="display: none;">
+          <span id="pathTipIcon">❌</span>
+          <span id="pathErrorText">指定的文件路径不存在</span>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn-path-action btn-reset" id="resetPathBtn" style="display: none;">恢复默认</button>
+        <div class="modal-foot-right">
+          <button type="button" class="btn-modal-cancel" id="modalCancelBtn">取消</button>
+          <button type="button" class="btn-path-action btn-save" id="savePathBtn">确定保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/ui/launcher.js"></script>
+</body>
+</html>
