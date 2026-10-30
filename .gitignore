@@ -34,3 +34,6 @@ settings.json
 # Runtime artifacts
 *.json.*.tmp
 .playwright-cli/
+
+# Audit output
+tools/missing-dict-candidates.json
