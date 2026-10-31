@@ -1,7 +1,7 @@
 {
   "edition": "lite",
   "version": "4.0.4",
-  "dictVersion": "2026-10-30-dictfix1",
+  "dictVersion": "2026-10-31-patterns1",
   "dicts": {
     "ui_v2.json": {
       "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/dicts/ui_v2.json",
@@ -41,7 +41,7 @@
       },
       "features/i18n.js": {
         "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/features/i18n.js",
-        "sha256": "cae011e9627fc86ca363e8f4d7ff7d769717d32cf5f4be61a7458adf1bd1950f"
+        "sha256": "33a4fbb71bc5b4e85b8a78f194a502b141864ced4b5affb51c2c73bf5f7c562b"
       },
       "features/proxy.js": {
         "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/features/proxy.js",
@@ -65,7 +65,7 @@
       },
       "adapters/desktop/renderer.js": {
         "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/adapters/desktop/renderer.js",
-        "sha256": "f8d00b1fe9308bff2f4b33ea1905eba05b6707110641d1e72cc1ae10a439d257"
+        "sha256": "4bed2161ea016af3fa99d9871a9ffd50212d1a60b2b4b960be654d27a3da601e"
       },
       "desktop/api.js": {
         "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/desktop/api.js",

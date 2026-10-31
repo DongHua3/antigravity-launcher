@@ -34,20 +34,53 @@ function loadDictionary(rootDir, dataDir) {
   return dictionary;
 }
 
+// Sentence patterns for text that carries numbers, which an exact-key dictionary can never hold.
+// This function is serialised into the page, so it must stay self-contained.
+function translatePattern(text) {
+  if (typeof text !== 'string') return null;
+  const units = { s: '秒', m: '分钟', h: '小时', d: '天' };
+  const duration = value => String(value).trim().replace(/[0-9]+ *[smhd]/g, token => {
+    const parts = token.match(/^([0-9]+) *([smhd])$/);
+    return parts ? parts[1] + ' ' + units[parts[2]] : token;
+  });
+  const span = '([0-9]+ *[smhd](?: +[0-9]+ *s)?)';
+  const rules = [
+    [new RegExp('^Worked for ' + span + '$'), match => '工作了 ' + duration(match[1])],
+    [new RegExp('^Thinking for ' + span + '$'), match => '思考中 ' + duration(match[1])],
+    [new RegExp('^Thought for ' + span + '$'), match => '思考了 ' + duration(match[1])],
+    [new RegExp('^' + span + ' ago$'), match => duration(match[1]) + '前'],
+    [/^([0-9]+) files? changed$/, match => match[1] + ' 个文件已更改'],
+    [/^just now$/, () => '刚刚'],
+    [/^Open external link: (.+)$/, match => '打开外部链接：' + match[1]]
+  ];
+  for (const rule of rules) {
+    const match = rule[0].exec(text);
+    if (!match) continue;
+    const result = rule[1](match);
+    if (result && result !== text) return result;
+  }
+  return null;
+}
+
 // This function also runs inside the AG renderer; keep it independent of Node and module globals.
-function installI18n(window, document, dictionary, enabled) {
+function installI18n(window, document, dictionary, enabled, patternTranslate = null) {
   window.__aglI18n?.dispose();
   const texts = new Map();
   const attributes = new Map();
   const ignored = 'script,style,pre,code,textarea,[contenteditable="true"],[data-testid*="message-content"]';
   const ignoredElement = element => element?.closest?.(ignored);
+  const pattern = typeof patternTranslate === 'function' ? patternTranslate : () => null;
   function translateText(node) {
     if (ignoredElement(node.parentElement)) return;
     const raw = node.nodeValue;
     if (texts.get(node)?.translated === raw) return;
     const key = raw?.trim();
-    if (!key || typeof dictionary[key] !== 'string' || dictionary[key] === key) return;
-    const translated = raw.replace(key, dictionary[key]);
+    if (!key) return;
+    const exact = typeof dictionary[key] === 'string' && dictionary[key] !== key ? dictionary[key] : null;
+    const replacement = exact !== null ? exact : pattern(key);
+    if (replacement === null) return;
+    const translated = raw.replace(key, replacement);
+    if (translated === raw) return;
     texts.set(node, { original: raw, translated });
     node.nodeValue = translated;
   }
@@ -57,8 +90,11 @@ function installI18n(window, document, dictionary, enabled) {
       const original = element.getAttribute(name);
       if (attributes.get(element)?.get(name)?.translated === original) continue;
       const key = original?.trim();
-      if (!key || !dictionary[key] || dictionary[key] === key) continue;
-      const translated = original.replace(key, dictionary[key]);
+      if (!key) continue;
+      const exact = typeof dictionary[key] === 'string' && dictionary[key] !== key ? dictionary[key] : null;
+      const replacement = exact !== null ? exact : pattern(key);
+      if (replacement === null) continue;
+      const translated = original.replace(key, replacement);
       if (!attributes.has(element)) attributes.set(element, new Map());
       attributes.get(element).set(name, { original, translated });
       element.setAttribute(name, translated);
@@ -107,4 +143,4 @@ function installI18n(window, document, dictionary, enabled) {
   return runtime;
 }
 
-module.exports = { DICT_FILES, loadDictionary, installI18n };
+module.exports = { DICT_FILES, loadDictionary, installI18n, translatePattern };

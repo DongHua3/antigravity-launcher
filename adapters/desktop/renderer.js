@@ -1,4 +1,4 @@
-const { installI18n } = require('../../features/i18n');
+const { installI18n, translatePattern } = require('../../features/i18n');
 
 // The only renderer payload: reversible DOM localisation. Nothing is reported back.
 function rendererSource(dictionary, settings) {
@@ -8,7 +8,7 @@ function rendererSource(dictionary, settings) {
     window.__aglMountGeneration = generation;
     function mount() {
       if (window.__aglMountGeneration !== generation) return;
-      (${installI18n.toString()})(window, document, ${JSON.stringify(dictionary)}, ${settings.enableI18n === true});
+      (${installI18n.toString()})(window, document, ${JSON.stringify(dictionary)}, ${settings.enableI18n === true}, (${translatePattern.toString()}));
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, { once: true });
     else mount();
