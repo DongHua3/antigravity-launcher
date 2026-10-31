@@ -66,7 +66,9 @@ IDE 版只支持启动与代理配置，不做界面汉化。
 
 ## 更新机制
 
-`update-manifest.json` 列出词典与内核文件的 SHA-256。应用只从 `raw.githubusercontent.com` / `github.com` / `objects.githubusercontent.com` 拉取，且只允许写入 `core/ features/ adapters/ desktop/ ui/ dicts/` 下的 `.js/.json/.css/.html`。
+`update-manifest.json` 列出词典与内核文件的 SHA-256。应用只从 `raw.githubusercontent.com` / `github.com` / `objects.githubusercontent.com` / `api.github.com` 拉取，且只允许写入 `core/ features/ adapters/ desktop/ ui/ dicts/` 下的 `.js/.json/.css/.html`。
+
+`raw.githubusercontent.com` 在部分网络下会被重置，此时自动回落到 `api.github.com` 的 contents 接口（`Accept: application/vnd.github.raw`，返回同样的字节）。面板配置了代理但该端口没有监听时，更新会跳过代理直接连接，不会反复等待超时。
 
 要把更新源换成自己的仓库：修改 `features/updater.js` 里的 `DEFAULT_MANIFEST_URL` 与 `UPDATE_HOSTS`，再运行 `npm run build:manifest` 生成清单。
 

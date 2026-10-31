@@ -3,13 +3,14 @@ const path = require('node:path');
 const http = require('node:http');
 const https = require('node:https');
 const tls = require('node:tls');
+const net = require('node:net');
 const { createHash } = require('node:crypto');
 const { readJson, writeJson } = require('../core/storage');
 const { DICT_FILES } = require('./i18n');
 
 const DEFAULT_MANIFEST_URL = 'https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/update-manifest.json';
 // The update channel may only ever be these hosts. Everything else is refused before any socket opens.
-const UPDATE_HOSTS = new Set(['raw.githubusercontent.com', 'github.com', 'objects.githubusercontent.com']);
+const UPDATE_HOSTS = new Set(['raw.githubusercontent.com', 'github.com', 'objects.githubusercontent.com', 'api.github.com']);
 const MAX_DOWNLOAD_BYTES = 8 * 1024 * 1024;
 const ALLOWED_RUNTIME_PREFIXES = ['core/', 'features/', 'adapters/', 'desktop/', 'ui/', 'dicts/'];
 const ALLOWED_RUNTIME_ROOT_FILES = new Set(['server.js', 'index.html']);
@@ -66,15 +67,15 @@ function readStreamBounded(stream, maxBytes = MAX_DOWNLOAD_BYTES) {
   });
 }
 
-function requestDirect(targetUrl, timeoutMs = 10000, redirects = 3) {
+function requestDirect(targetUrl, timeoutMs = 10000, redirects = 3, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(targetUrl);
     const client = parsed.protocol === 'https:' ? https : http;
-    const req = client.get(parsed, { timeout: timeoutMs, headers: { 'User-Agent': 'AGLauncher-Updater/4.0' } }, async res => {
+    const req = client.get(parsed, { timeout: timeoutMs, headers: { 'User-Agent': 'AGLauncher-Updater/4.0', ...extraHeaders } }, async res => {
       if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location && redirects > 0) {
         res.resume();
         try {
-          resolve(await requestDirect(new URL(res.headers.location, parsed).toString(), timeoutMs, redirects - 1));
+          resolve(await requestDirect(new URL(res.headers.location, parsed).toString(), timeoutMs, redirects - 1, extraHeaders));
         } catch (err) { reject(err); }
         return;
       }
@@ -91,7 +92,7 @@ function requestDirect(targetUrl, timeoutMs = 10000, redirects = 3) {
   });
 }
 
-function requestViaHttpProxy(targetUrl, proxyPort, timeoutMs = 10000, redirects = 3) {
+function requestViaHttpProxy(targetUrl, proxyPort, timeoutMs = 10000, redirects = 3, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(targetUrl);
     if (parsed.protocol === 'http:') {
@@ -101,7 +102,7 @@ function requestViaHttpProxy(targetUrl, proxyPort, timeoutMs = 10000, redirects 
         method: 'GET',
         path: parsed.toString(),
         timeout: timeoutMs,
-        headers: { Host: parsed.host, 'User-Agent': 'AGLauncher-Updater/4.0' }
+        headers: { Host: parsed.host, 'User-Agent': 'AGLauncher-Updater/4.0', ...extraHeaders }
       }, async res => {
         if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location && redirects > 0) {
           res.resume();
@@ -145,12 +146,12 @@ function requestViaHttpProxy(targetUrl, proxyPort, timeoutMs = 10000, redirects 
         method: 'GET',
         createConnection: () => tlsSocket,
         timeout: timeoutMs,
-        headers: { Host: parsed.host, 'User-Agent': 'AGLauncher-Updater/4.0', Connection: 'close' }
+        headers: { Host: parsed.host, 'User-Agent': 'AGLauncher-Updater/4.0', Connection: 'close', ...extraHeaders }
       }, async httpsRes => {
         if ([301, 302, 307, 308].includes(httpsRes.statusCode) && httpsRes.headers.location && redirects > 0) {
           httpsRes.resume();
           try {
-            resolve(await requestViaHttpProxy(new URL(httpsRes.headers.location, parsed).toString(), proxyPort, timeoutMs, redirects - 1));
+            resolve(await requestViaHttpProxy(new URL(httpsRes.headers.location, parsed).toString(), proxyPort, timeoutMs, redirects - 1, extraHeaders));
           } catch (err) { reject(err); }
           return;
         }
@@ -172,17 +173,63 @@ function requestViaHttpProxy(targetUrl, proxyPort, timeoutMs = 10000, redirects 
   });
 }
 
-async function fetchBuffer(targetUrl, proxyPort) {
+// Some networks reset raw.githubusercontent.com but still serve api.github.com.
+// The contents API returns the very same bytes with this Accept header.
+function mirrorOf(targetUrl) {
+  try {
+    const parsed = new URL(targetUrl);
+    if (parsed.hostname !== 'raw.githubusercontent.com') return null;
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (parts.length < 4) return null;
+    const owner = parts[0], repo = parts[1], ref = parts[2];
+    const path = parts.slice(3).join('/');
+    return {
+      url: `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
+      headers: { Accept: 'application/vnd.github.raw' }
+    };
+  } catch { return null; }
+}
+
+const proxyCache = new Map();
+function proxyAlive(port, timeoutMs = 250) {
+  const cached = proxyCache.get(port);
+  if (cached && Date.now() - cached.at < 30000) return Promise.resolve(cached.ok);
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = ok => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.destroy();
+      proxyCache.set(port, { ok, at: Date.now() });
+      resolve(ok);
+    };
+    const socket = net.connect({ host: '127.0.0.1', port });
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    socket.once('connect', () => finish(true));
+    socket.once('error', () => finish(false));
+  });
+}
+
+async function fetchBuffer(targetUrl, proxyPort, extraHeaders = {}) {
   const parsed = new URL(targetUrl);
   const isLoopback = ['127.0.0.1', 'localhost', '[::1]'].includes(parsed.hostname);
-  if (!isLoopback && Number.isInteger(proxyPort) && proxyPort > 0 && proxyPort <= 65535) {
-    try {
-      return await requestViaHttpProxy(targetUrl, proxyPort);
-    } catch {
-      // Fall back to direct connection if local proxy is not listening yet.
-    }
+  const usableProxy = !isLoopback && Number.isInteger(proxyPort) && proxyPort > 0 && proxyPort <= 65535;
+  const useProxy = usableProxy ? await proxyAlive(proxyPort) : false;
+  const mirror = mirrorOf(targetUrl);
+  const attempts = [];
+  if (useProxy) attempts.push(() => requestViaHttpProxy(targetUrl, proxyPort, 10000, 3, extraHeaders));
+  attempts.push(() => requestDirect(targetUrl, 10000, 3, extraHeaders));
+  if (mirror) {
+    if (useProxy) attempts.push(() => requestViaHttpProxy(mirror.url, proxyPort, 10000, 3, mirror.headers));
+    attempts.push(() => requestDirect(mirror.url, 10000, 3, mirror.headers));
   }
-  return requestDirect(targetUrl);
+  let lastError;
+  for (const attempt of attempts) {
+    try { return await attempt(); }
+    catch (error) { lastError = error; }
+  }
+  throw new Error(`更新源不可达（已尝试直连与 API 入口）: ${lastError ? lastError.message : '未知错误'}`);
 }
 
 function resolveRuntimeRoot(bundledRoot, dataDir) {
@@ -377,4 +424,4 @@ class Updater {
   }
 }
 
-module.exports = { Updater, sha256Hex, compareVersions, isAllowedRuntimePath, resolveRuntimeRoot };
+module.exports = { Updater, sha256Hex, compareVersions, isAllowedRuntimePath, resolveRuntimeRoot, mirrorOf, fetchBuffer, assertUpdateSource };

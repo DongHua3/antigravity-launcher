@@ -8,7 +8,7 @@ const { Session } = require('../core/session');
 const { writeJson } = require('../core/storage');
 const { normalizeSettings, assertLaunchSettingsMutable } = require('../core/settings');
 const { loadDictionary } = require('../features/i18n');
-const { Updater, sha256Hex, isAllowedRuntimePath, resolveRuntimeRoot } = require('../features/updater');
+const { Updater, sha256Hex, isAllowedRuntimePath, resolveRuntimeRoot, mirrorOf, assertUpdateSource } = require('../features/updater');
 
 function sessionFixture({ spawnError = false, alreadyRunning = false } = {}) {
   const calls = [];
@@ -307,4 +307,18 @@ test('Update downloads skip the local proxy when the proxy is switched off', asy
     await make({ port: 7890, enableProxy: true }).checkAndApply();
     assert.deepEqual(seen, [0, 7890], 'proxy off must download directly, proxy on must use the configured port');
   } finally { fs.rmSync(rootDir, { recursive: true, force: true }); }
+});
+
+test('A blocked raw host falls back to the contents API, and only known hosts are accepted', () => {
+  const raw = 'https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/dicts/ui_v2.json';
+  const mirror = mirrorOf(raw);
+  assert.equal(mirror.url, 'https://api.github.com/repos/DongHua3/antigravity-launcher/contents/dicts/ui_v2.json?ref=main');
+  assert.equal(mirror.headers.Accept, 'application/vnd.github.raw');
+  assert.equal(mirrorOf('https://github.com/o/r/raw/main/x'), null, 'Only raw.githubusercontent.com is mirrored');
+  assert.equal(mirrorOf('http://127.0.0.1:8080/x'), null);
+
+  assert.doesNotThrow(() => assertUpdateSource('https://api.github.com/repos/o/r/contents/x?ref=main'));
+  assert.doesNotThrow(() => assertUpdateSource('https://raw.githubusercontent.com/o/r/main/x'));
+  assert.throws(() => assertUpdateSource('https://example.com/x'), /允许列表/);
+  assert.throws(() => assertUpdateSource('http://api.github.com/x'), /https/);
 });

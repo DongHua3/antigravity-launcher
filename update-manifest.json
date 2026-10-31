@@ -49,7 +49,7 @@
       },
       "features/updater.js": {
         "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/features/updater.js",
-        "sha256": "1ad9ec8f77ceefa8647cabe464ba4c16cbb4010b998b46f263e39af27d957d93"
+        "sha256": "2d898af8f3cbad7b67dfcdb70549fb58826d333510b5180ba773f2a8dc4fba5d"
       },
       "adapters/desktop/cdp.js": {
         "url": "https://raw.githubusercontent.com/DongHua3/antigravity-launcher/main/adapters/desktop/cdp.js",
